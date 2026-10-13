@@ -41,3 +41,21 @@
     transform: translateX(6px);
   }
 }
+
+.correct {
+  background-color: green;
+  border-color: green;
+  color: white;
+}
+
+.misplaced {
+  background-color: yellow;
+  border-color: yellow;
+  color: white;
+}
+
+.incorrect {
+  background-color: red;
+  border-color: red;
+  color: white;
+}

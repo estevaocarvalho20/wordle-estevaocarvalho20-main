@@ -1,8 +1,25 @@
 // Build the grid, capture keyboard input, and connect the DOM to game.js here.
+import { scoreGuess } from "./game.js";
+
+document.addEventListener("wordle:guess-submit", (event) => {
+  const { guess, attempt } = event.detail;
+  const results = scoreGuess(gameState.targetWord, guess);
+
+  results.forEach((result, column) => {
+    const cell = document.querySelector(`#cell-${attempt}-${column}`);
+    cell.classList.add(result);
+  });
+
+  if (attempt + 1 < gameConfig.attempts) {
+    gameState.currentAttempt = attempt + 1;
+    gameState.currentPosition = 0;
+  }
+});
 
 const gameConfig = { attempts: 6, wordLength: 5 };
 
 const gameState = {
+  targetWord: "hello",
   currentAttempt: 0,
   currentPosition: 0,
   guesses: Array.from({ length: gameConfig.attempts }, () =>

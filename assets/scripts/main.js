@@ -1,5 +1,10 @@
 // Build the grid, capture keyboard input, and connect the DOM to game.js here.
-import { isValidGuess, loadTargetWord, scoreGuess } from "./game.js";
+import {
+  gameConfig,
+  isValidGuess,
+  loadTargetWord,
+  scoreGuess,
+} from "./game.js";
 
 document.addEventListener("wordle:guess-submit", async (event) => {
   const { guess, attempt } = event.detail;
@@ -63,8 +68,6 @@ document.addEventListener("wordle:guess-submit", async (event) => {
     gameState.submitting = false;
   }
 });
-
-const gameConfig = { attempts: 6, wordLength: 5 };
 
 const gameState = {
   targetWord: "",

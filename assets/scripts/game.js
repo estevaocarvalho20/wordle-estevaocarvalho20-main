@@ -1,6 +1,8 @@
 // Implement the Wordle data, network, validation, and scoring functions described
 // in README.md. Keep DOM manipulation out of this file.
 
+export const gameConfig = { attempts: 6, wordLength: 5 };
+
 export async function isValidGuess(guess) {
   const response = await fetch(
     `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(guess)}`,
@@ -10,7 +12,7 @@ export async function isValidGuess(guess) {
 
 export async function loadTargetWord() {
   const response = await fetch(
-    "https://random-word-api.herokuapp.com/word?length=5",
+    `https://random-word-api.herokuapp.com/word?length=${gameConfig.wordLength}`,
   );
   if (!response.ok) {
     throw new Error(`Failed to fetch target word: ${response.status}`);

@@ -1,25 +1,55 @@
 // Build the grid, capture keyboard input, and connect the DOM to game.js here.
-import { scoreGuess } from "./game.js";
+import { isValidGuess, loadTargetWord, scoreGuess } from "./game.js";
 
-document.addEventListener("wordle:guess-submit", (event) => {
+document.addEventListener("wordle:guess-submit", async (event) => {
   const { guess, attempt } = event.detail;
-  const results = scoreGuess(gameState.targetWord, guess);
+  if (gameState.finished || gameState.submitting) {
+    return;
+  }
 
-  results.forEach((result, column) => {
-    const cell = document.querySelector(`#cell-${attempt}-${column}`);
-    cell.classList.add(result);
-  });
+  gameState.submitting = true;
 
-  if (attempt + 1 < gameConfig.attempts) {
-    gameState.currentAttempt = attempt + 1;
-    gameState.currentPosition = 0;
+  try {
+    const valid = await isValidGuess(guess);
+
+    if (!valid) {
+      for (let column = 0; column < gameConfig.wordLength; column += 1) {
+        const cell = document.querySelector(`#cell-${attempt}-${column}`);
+        if (cell) {
+          shakeCell(cell);
+        }
+      }
+      return;
+    }
+
+    const results = scoreGuess(gameState.targetWord, guess);
+
+    results.forEach((result, column) => {
+      const cell = document.querySelector(`#cell-${attempt}-${column}`);
+      if (cell) {
+        cell.classList.add(result);
+      }
+    });
+
+    if (attempt + 1 < gameConfig.attempts) {
+      gameState.currentAttempt = attempt + 1;
+      gameState.currentPosition = 0;
+    }
+  } catch (error) {
+    console.error("Error validating guess:", error);
+    const result = document.querySelector("#game-result");
+    if (result) {
+      result.textContent = "Could not validate guess. Please try again.";
+    }
+  } finally {
+    gameState.submitting = false;
   }
 });
 
 const gameConfig = { attempts: 6, wordLength: 5 };
 
 const gameState = {
-  targetWord: "hello",
+  targetWord: "",
   currentAttempt: 0,
   currentPosition: 0,
   guesses: Array.from({ length: gameConfig.attempts }, () =>
@@ -41,6 +71,25 @@ if (grid) {
     }
   }
 }
+
+async function initializeGame() {
+  gameState.submitting = true;
+
+  try {
+    gameState.targetWord = await loadTargetWord();
+  } catch (error) {
+    console.error("Error loading target word:", error);
+    gameState.finished = true;
+    const result = document.querySelector("#game-result");
+    if (result) {
+      result.textContent = "Could not load the target word. Please refresh.";
+    }
+  } finally {
+    gameState.submitting = false;
+  }
+}
+
+initializeGame();
 
 function shakeCell(cell) {
   cell.classList.remove("animate__animated", "animate__shakeX");

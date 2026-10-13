@@ -31,6 +31,24 @@ document.addEventListener("wordle:guess-submit", async (event) => {
       }
     });
 
+    const gameResult = document.querySelector("#game-result");
+
+    if (guess === gameState.targetWord) {
+      gameState.finished = true;
+      if (gameResult) {
+        gameResult.textContent = "You won!";
+      }
+      return;
+    }
+
+    if (attempt + 1 === gameConfig.attempts) {
+      gameState.finished = true;
+      if (gameResult) {
+        gameResult.textContent = "Game Over!";
+      }
+      return;
+    }
+
     if (attempt + 1 < gameConfig.attempts) {
       gameState.currentAttempt = attempt + 1;
       gameState.currentPosition = 0;

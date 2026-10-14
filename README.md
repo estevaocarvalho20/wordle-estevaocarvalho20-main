@@ -189,12 +189,15 @@ series of messages such as “update” does not demonstrate the required workfl
 
 Replace the prompts below with your answers before submitting.
 
-1. Approximately how long did this assignment take, and where did you spend the
-   most time?
+1. Approximately how long did this assignment take, and where did you spend the most time?
+   I took an entire night and almost a full day dedicated for it, Most time that I spended is 100% step 2 was the most confusing and made me look even in outside sources to learn how could I make it.
 2. How does your scoring algorithm prevent duplicate letters from being marked
    `misplaced` too many times?
+   my algorithm marks the position as correct and counts as only target, then check the unscored guess marking as misplaced, reducing its count and and making it not be used more than once.
 3. How did you separate game rules from DOM manipulation?
+   I put score and api in game.js while my DOM is on main.js
 4. What did the deterministic API tests help you diagnose?
+   They let me predict target and accepted and rejected guesses without live service. Helping validation and incrementing its own behavior.
 
 ## Final checklist
 

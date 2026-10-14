@@ -1,95 +1,202 @@
 // Build the grid, capture keyboard input, and connect the DOM to game.js here.
+import "animate.css";
 import {
+  checkGuess,
   gameConfig,
-  isValidGuess,
-  loadTargetWord,
-  scoreGuess,
+  gameState,
+  getRandomWord,
+  isValidWord,
 } from "./game.js";
 
-document.addEventListener("wordle:guess-submit", async (event) => {
-  const { guess, attempt } = event.detail;
+const grid = document.querySelector("#wordle-grid");
+const gameResultsParagraph = document.querySelector("#game-result");
+
+function addTileToGrid(row, column) {
+  const tile = document.createElement("div");
+  tile.className = "letter";
+  tile.id = `cell-${row}-${column}`;
+  tile.dataset.row = String(row);
+  tile.dataset.column = String(column);
+  grid.appendChild(tile);
+}
+
+function setupGrid() {
+  if (!grid) {
+    return;
+  }
+
+  grid.replaceChildren();
+  grid.style.gridTemplateColumns = `repeat(${gameConfig.wordLength}, 60px)`;
+
+  for (let row = 0; row < gameConfig.attempts; row += 1) {
+    for (let column = 0; column < gameConfig.wordLength; column += 1) {
+      addTileToGrid(row, column);
+    }
+  }
+}
+
+function isLetter(letter) {
+  return /^[a-z]$/i.test(letter);
+}
+
+function animateElement(element, animation) {
+  if (!element) {
+    return;
+  }
+
+  const animationClass = `animate__${animation}`;
+  element.classList.remove("animate__animated", animationClass);
+  void element.offsetWidth;
+  element.classList.add("animate__animated", animationClass);
+  element.addEventListener(
+    "animationend",
+    () => {
+      element.classList.remove("animate__animated", animationClass);
+    },
+    { once: true },
+  );
+}
+
+function addLetter(letter) {
+  if (gameState.currentPosition >= gameConfig.wordLength) {
+    return;
+  }
+
+  const row = gameState.currentAttempt;
+  const column = gameState.currentPosition;
+  const tile = document.querySelector(`#cell-${row}-${column}`);
+
+  gameState.guesses[row][column] = letter.toLowerCase();
+  if (tile) {
+    tile.textContent = letter.toLowerCase();
+    animateElement(tile, "bounceIn");
+  }
+  gameState.currentPosition += 1;
+}
+
+function removeLetter() {
+  if (gameState.currentPosition === 0) {
+    return;
+  }
+
+  gameState.currentPosition -= 1;
+  gameState.guesses[gameState.currentAttempt][gameState.currentPosition] = "";
+
+  const tile = document.querySelector(
+    `#cell-${gameState.currentAttempt}-${gameState.currentPosition}`,
+  );
+  if (tile) {
+    tile.textContent = "";
+  }
+}
+
+function shakeRow(columns = Array.from(
+  { length: gameConfig.wordLength },
+  (_, column) => column,
+)) {
+  for (const column of columns) {
+    const tile = document.querySelector(
+      `#cell-${gameState.currentAttempt}-${column}`,
+    );
+    animateElement(tile, "shakeX");
+  }
+}
+
+function showMessage(message) {
+  if (gameResultsParagraph) {
+    gameResultsParagraph.textContent = message;
+  }
+}
+
+function lockInput() {
+  gameState.finished = true;
+}
+
+function revealResults(results) {
+  const delayBetweenTileReveal = 300;
+
+  results.forEach((result, column) => {
+    const tile = document.querySelector(
+      `#cell-${gameState.currentAttempt}-${column}`,
+    );
+
+    if (!tile) {
+      return;
+    }
+
+    tile.classList.add(result);
+    window.setTimeout(
+      () => animateElement(tile, "flipInX"),
+      column * delayBetweenTileReveal,
+    );
+  });
+}
+
+async function submitGuess() {
+  if (gameState.currentPosition !== gameConfig.wordLength) {
+    const missingColumns = gameState.guesses[gameState.currentAttempt]
+      .map((letter, column) => (letter === "" ? column : -1))
+      .filter((column) => column !== -1);
+    shakeRow(missingColumns);
+    return;
+  }
+
+  const guess = gameState.guesses[gameState.currentAttempt].join("");
+  gameState.submitting = true;
+
+  try {
+    const isValid = await isValidWord(guess);
+
+    if (!isValid) {
+      shakeRow();
+      return;
+    }
+
+    const results = checkGuess(gameState.targetWord, guess);
+    revealResults(results);
+
+    const isWon = results.every((result) => result === "correct");
+    if (isWon) {
+      lockInput();
+      showMessage("You won!");
+      return;
+    }
+
+    if (gameState.currentAttempt === gameConfig.attempts - 1) {
+      lockInput();
+      showMessage("Game Over!");
+      return;
+    }
+
+    gameState.currentAttempt += 1;
+    gameState.currentPosition = 0;
+  } catch (error) {
+    console.error(`Failed to validate guess "${guess}":`, error);
+    showMessage("Could not validate guess. Please try again.");
+  } finally {
+    gameState.submitting = false;
+  }
+}
+
+function handleKeydown(event) {
   if (gameState.finished || gameState.submitting) {
     return;
   }
 
-  gameState.submitting = true;
-
-  try {
-    const valid = await isValidGuess(guess);
-
-    if (!valid) {
-      for (let column = 0; column < gameConfig.wordLength; column += 1) {
-        const cell = document.querySelector(`#cell-${attempt}-${column}`);
-        if (cell) {
-          shakeCell(cell);
-        }
-      }
-      return;
-    }
-
-    const results = scoreGuess(gameState.targetWord, guess);
-
-    results.forEach((result, column) => {
-      const cell = document.querySelector(`#cell-${attempt}-${column}`);
-      if (cell) {
-        cell.classList.add(result);
-      }
-    });
-
-    const gameResult = document.querySelector("#game-result");
-
-    if (guess === gameState.targetWord) {
-      gameState.finished = true;
-      if (gameResult) {
-        gameResult.textContent = "You won!";
-      }
-      return;
-    }
-
-    if (attempt + 1 === gameConfig.attempts) {
-      gameState.finished = true;
-      if (gameResult) {
-        gameResult.textContent = "Game Over!";
-      }
-      return;
-    }
-
-    if (attempt + 1 < gameConfig.attempts) {
-      gameState.currentAttempt = attempt + 1;
-      gameState.currentPosition = 0;
-    }
-  } catch (error) {
-    console.error("Error validating guess:", error);
-    const result = document.querySelector("#game-result");
-    if (result) {
-      result.textContent = "Could not validate guess. Please try again.";
-    }
-  } finally {
-    gameState.submitting = false;
+  if (isLetter(event.key)) {
+    addLetter(event.key);
+    return;
   }
-});
 
-const gameState = {
-  targetWord: "",
-  currentAttempt: 0,
-  currentPosition: 0,
-  guesses: Array.from({ length: gameConfig.attempts }, () =>
-    Array(gameConfig.wordLength).fill(""),
-  ),
-  finished: false,
-  submitting: false,
-};
+  if (event.key === "Backspace") {
+    event.preventDefault();
+    removeLetter();
+    return;
+  }
 
-const grid = document.querySelector("#wordle-grid");
-
-if (grid) {
-  for (let row = 0; row < gameConfig.attempts; row += 1) {
-    for (let column = 0; column < gameConfig.wordLength; column += 1) {
-      const cell = document.createElement("div");
-      cell.id = `cell-${row}-${column}`;
-      cell.className = "letter";
-      grid.appendChild(cell);
-    }
+  if (event.key === "Enter") {
+    event.preventDefault();
+    void submitGuess();
   }
 }
 
@@ -97,99 +204,16 @@ async function initializeGame() {
   gameState.submitting = true;
 
   try {
-    gameState.targetWord = await loadTargetWord();
+    gameState.targetWord = await getRandomWord();
   } catch (error) {
     console.error("Error loading target word:", error);
-    gameState.finished = true;
-    const result = document.querySelector("#game-result");
-    if (result) {
-      result.textContent = "Could not load the target word. Please refresh.";
-    }
+    lockInput();
+    showMessage("Could not load the target word. Please refresh.");
   } finally {
     gameState.submitting = false;
   }
 }
 
-initializeGame();
-
-function shakeCell(cell) {
-  cell.classList.remove("animate__animated", "animate__shakeX");
-  void cell.offsetWidth;
-  cell.classList.add("animate__animated", "animate__shakeX");
-}
-
-function handleEnter() {
-  const guess = gameState.guesses[gameState.currentAttempt];
-  const missingColumns = guess
-    .map((letter, column) => (letter === "" ? column : -1))
-    .filter((column) => column !== -1);
-
-  if (missingColumns.length > 0) {
-    for (const column of missingColumns) {
-      const cell = document.querySelector(
-        `#cell-${gameState.currentAttempt}-${column}`,
-      );
-      if (cell) {
-        shakeCell(cell);
-      }
-    }
-    return;
-  }
-
-  document.dispatchEvent(
-    new CustomEvent("wordle:guess-submit", {
-      detail: {
-        guess: guess.join(""),
-        attempt: gameState.currentAttempt,
-      },
-    }),
-  );
-}
-
-document.addEventListener("keydown", (event) => {
-  if (gameState.finished || gameState.submitting) {
-    return;
-  }
-
-  if (event.key === "Enter") {
-    event.preventDefault();
-    handleEnter();
-    return;
-  }
-
-  if (event.key === "Backspace") {
-    event.preventDefault();
-    if (gameState.currentPosition === 0) {
-      return;
-    }
-
-    gameState.currentPosition -= 1;
-    gameState.guesses[gameState.currentAttempt][gameState.currentPosition] = "";
-    const cell = document.querySelector(
-      `#cell-${gameState.currentAttempt}-${gameState.currentPosition}`,
-    );
-    if (cell) {
-      cell.textContent = "";
-    }
-    return;
-  }
-
-  if (!/^[a-z]$/i.test(event.key)) {
-    return;
-  }
-
-  if (gameState.currentPosition >= gameConfig.wordLength) {
-    return;
-  }
-
-  const letter = event.key.toLowerCase();
-  const row = gameState.currentAttempt;
-  const column = gameState.currentPosition;
-  gameState.guesses[row][column] = letter;
-
-  const cell = document.querySelector(`#cell-${row}-${column}`);
-  if (cell) {
-    cell.textContent = letter;
-  }
-  gameState.currentPosition += 1;
-});
+setupGrid();
+document.addEventListener("keydown", handleKeydown);
+void initializeGame();
